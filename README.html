@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kantin Sekolah Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden { display: none; }
+        #splash { transition: opacity 0.5s ease; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div id="splash" class="fixed inset-0 flex flex-col items-center justify-center bg-blue-600 text-white z-50">
+        <h1 class="text-4xl font-bold mb-2">KantinKu</h1>
+        <p class="animate-pulse">Memuat aplikasi...</p>
+    </div>
+
+    <div class="max-w-md mx-auto min-h-screen bg-white shadow-lg overflow-hidden relative">
+        
+        <section id="auth-section" class="p-6 hidden">
+            <h2 id="auth-title" class="text-2xl font-bold mb-6 text-center text-blue-600">Login</h2>
+            <div id="login-form">
+                <input type="text" id="login-id" placeholder="Email atau No. HP" class="w-full border p-3 rounded mb-4">
+                <input type="password" id="login-pass" placeholder="Password" class="w-full border p-3 rounded mb-4">
+                <button onclick="handleLogin()" class="w-full bg-blue-600 text-white p-3 rounded font-bold">Login</button>
+                <p class="mt-4 text-center text-sm">Belum punya akun? <a href="#" onclick="toggleAuth(false)" class="text-blue-600 underline">Daftar di sini</a></p>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <input type="text" id="reg-nama" placeholder="Nama Lengkap" class="w-full border p-2 rounded mb-2">
+                <input type="text" id="reg-kelas" placeholder="Kelas" class="w-full border p-2 rounded mb-2">
+                <input type="text" id="reg-hp" placeholder="No. HP" class="w-full border p-2 rounded mb-2">
+                <input type="email" id="reg-email" placeholder="Email" class="w-full border p-2 rounded mb-2">
+                <input type="password" id="reg-pass" placeholder="Password" class="w-full border p-2 rounded mb-4">
+                <button onclick="handleRegister()" class="w-full bg-green-600 text-white p-3 rounded font-bold">Simpan Data (Register)</button>
+                <p class="mt-4 text-center text-sm">Sudah punya akun? <a href="#" onclick="toggleAuth(true)" class="text-blue-600 underline">Login</a></p>
+            </div>
+        </section>
+
+        <section id="menu-section" class="p-4 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Menu Kantin</h2>
+                <button onclick="showCart()" class="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm font-bold">🛒 Keranjang (<span id="cart-count">0</span>)</button>
+            </div>
+            <div id="menu-list" class="grid grid-cols-1 gap-4">
+                </div>
+        </section>
+
+        <section id="cart-section" class="p-4 hidden">
+            <h2 class="text-xl font-bold mb-4">Review Pesanan</h2>
+            <div id="cart-items" class="mb-4"></div>
+            <hr class="mb-4">
+            <div class="flex justify-between font-bold text-lg mb-6">
+                <span>Total:</span>
+                <span id="total-price">Rp 0</span>
+            </div>
+            
+            <div class="space-y-3">
+                <p class="text-sm font-bold">11. Pilih Metode Pembayaran:</p>
+                <select id="payment-method" class="w-full border p-2 rounded">
+                    <option value="Tunai">Tunai</option>
+                    <option value="QRIS">QRIS</option>
+                </select>
+                <div class="flex gap-2">
+                    <button onclick="showMenu()" class="flex-1 bg-gray-300 p-3 rounded font-bold text-sm">Kembali Pilih Menu</button>
+                    <button onclick="processPayment()" class="flex-1 bg-blue-600 text-white p-3 rounded font-bold text-sm">Konfirmasi & Bayar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="success-section" class="p-6 text-center hidden">
+            <div class="text-6xl mb-4">✅</div>
+            <h2 class="text-2xl font-bold text-green-600 mb-2">Pesanan Berhasil!</h2>
+            <p class="text-gray-600 mb-6">Silakan ambil pesanan Anda di loket.</p>
+            <div class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-400 mb-6 text-left">
+                <p class="text-xs text-gray-500">NOMOR ANTRIAN</p>
+                <p id="queue-number" class="text-4xl font-black text-center py-2">#001</p>
+                <p id="order-detail" class="text-sm mt-2"></p>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-blue-600 text-white p-3 rounded font-bold">Selesai / Pesan Lagi</button>
+        </section>
+
+    </div>
+
+    <script>
+        // Data Dummy Menu
+        const menus = [
+            { id: 1, nama: "Nasi Goreng", harga: 15000, stok: 10 },
+            { id: 2, nama: "Mie Ayam", harga: 12000, stok: 5 },
+            { id: 3, nama: "Es Teh Manis", harga: 5000, stok: 20 }
+        ];
+
+        let cart = [];
+        let currentUser = JSON.parse(localStorage.getItem('user')) || null;
+
+        // 2. Simulasi Splash Screen
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('splash').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash').classList.add('hidden');
+                    checkAuth();
+                }, 500);
+            }, 1500);
+        };
+
+        // 4. Cek Akun & Tampilkan Login/Register
+        function checkAuth() {
+            hideAll();
+            document.getElementById('auth-section').classList.remove('hidden');
+            toggleAuth(!currentUser); 
+        }
+
+        function toggleAuth(showLogin) {
+            document.getElementById('auth-title').innerText = showLogin ? "Login" : "Register";
+            document.getElementById('login-form').classList.toggle('hidden', !showLogin);
+            document.getElementById('register-form').classList.toggle('hidden', showLogin);
+        }
+
+        // Simpan data ke database (localStorage)
+        function handleRegister() {
+            const user = {
+                nama: document.getElementById('reg-nama').value,
+                email: document.getElementById('reg-email').value,
+                pass: document.getElementById('reg-pass').value
+            };
+            if(!user.email || !user.pass) return alert("Data harus lengkap!");
+            localStorage.setItem('user', JSON.stringify(user));
+            alert("Registrasi Berhasil! Silakan Login.");
+            toggleAuth(true);
+        }
+
+        // Validasi Data
+        function handleLogin() {
+            const id = document.getElementById('login-id').value;
+            const pass = document.getElementById('login-pass').value;
+            const savedUser = JSON.parse(localStorage.getItem('user'));
+
+            if(savedUser && (id === savedUser.email || id === savedUser.hp) && pass === savedUser.pass) {
+                showMenu();
+            } else {
+                alert("Login Gagal! Username atau Password salah.");
+            }
+        }
+
+        // 5. Tampilkan Beranda
+        function showMenu() {
+            hideAll();
+            document.getElementById('menu-section').classList.remove('hidden');
+            const list = document.getElementById('menu-list');
+            list.innerHTML = "";
+            menus.forEach(item => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center border p-3 rounded bg-white">
+                        <div>
+                            <p class="font-bold">${item.nama}</p>
+                            <p class="text-blue-600">Rp ${item.harga.toLocaleString()}</p>
+                            <p class="text-xs text-gray-400">Stok: ${item.stok}</p>
+                        </div>
+                        <button onclick="addToCart(${item.id})" class="bg-green-500 text-white px-4 py-2 rounded text-sm font-bold">7. Tambah</button>
+                    </div>
+                `;
+            });
+        }
+
+        // 7. Tambahkan ke keranjang
+        function addToCart(id) {
+            const item = menus.find(m => m.id === id);
+            if(item.stok <= 0) return alert("Stok habis!");
+            cart.push(item);
+            document.getElementById('cart-count').innerText = cart.length;
+            alert(`${item.nama} ditambahkan!`);
+        }
+
+        // 8. Tampilkan Keranjang
+        function showCart() {
+            if(cart.length === 0) return alert("Keranjang masih kosong!");
+            hideAll();
+            document.getElementById('cart-section').classList.remove('hidden');
+            const cartDiv = document.getElementById('cart-items');
+            cartDiv.innerHTML = "";
+            let total = 0;
+            cart.forEach(item => {
+                total += item.harga;
+                cartDiv.innerHTML += `<div class="flex justify-between text-sm py-1"><span>${item.nama}</span><span>Rp ${item.harga.toLocaleString()}</span></div>`;
+            });
+            document.getElementById('total-price').innerText = `Rp ${total.toLocaleString()}`;
+        }
+
+        // 12 - 15. Proses Akhir
+        function processPayment() {
+            const method = document.getElementById('payment-method').value;
+            // 12. Simpan pesanan & 13. Kurangi stok (simulasi logic)
+            cart.forEach(item => {
+                const menuIndex = menus.findIndex(m => m.id === item.id);
+                menus[menuIndex].stok -= 1;
+            });
+
+            hideAll();
+            document.getElementById('success-section').classList.remove('hidden');
+            document.getElementById('queue-number').innerText = "#00" + Math.floor(Math.random() * 100);
+            document.getElementById('order-detail').innerText = `Metode: ${method} | Total: ${document.getElementById('total-price').innerText}`;
+        }
+
+        function hideAll() {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+        }
+    </script>
+</body>
+</html>
